@@ -1,4 +1,4 @@
-package main
+package block
 
 import (
 	"crypto/sha256"
@@ -146,6 +146,22 @@ func (bc *Blockchain) Mining() bool {
 	return true
 }
 
+func (bc *Blockchain) CalculateTotalAmount(blockchainAddress string) float32 {
+	var totalAmount float32 = 0.0
+	for _, b := range bc.chain {
+		for _, t := range b.transactions {
+			value := t.value
+			if blockchainAddress == t.recipientBlockChainAddress {
+				totalAmount += value
+			}
+			if blockchainAddress == t.senderBlockChainAddress {
+				totalAmount -= value
+			}
+		}
+	}
+	return totalAmount
+}
+
 // Transaction
 type Transaction struct {
 	senderBlockChainAddress    string
@@ -179,22 +195,4 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		RecipientBlockChainAddress: t.recipientBlockChainAddress,
 		Value:                      t.value,
 	})
-}
-
-func main() {
-	myAddress := "my_address"
-	blockChain := NewBlockchain(myAddress)
-	blockChain.Print()
-
-	blockChain.AddTransaction("A", "B", 1.0)
-	blockChain.Mining()
-	blockChain.Print()
-
-	blockChain.AddTransaction("C", "D", 2.0)
-	blockChain.AddTransaction("X", "Y", 3.0)
-
-	blockChain.Mining()
-
-	blockChain.Print()
-
 }
