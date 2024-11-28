@@ -21,7 +21,7 @@ type Wallet struct {
 
 type Transaction struct {
 	senderPrivateKey           *ecdsa.PrivateKey
-	senderPublicKet            *ecdsa.PublicKey
+	senderPublicKey            *ecdsa.PublicKey
 	senderBlockchainAddress    string
 	recipientBlockchainAddress string
 	value                      float32
@@ -32,7 +32,7 @@ func NewWallet() *Wallet {
 	w := new(Wallet)
 	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	w.privateKey = privateKey
-	w.publicKey = &privateKey.PublicKey
+	w.publicKey = &w.privateKey.PublicKey
 
 	// SHA-256 on publickey
 	h2 := sha256.New()
@@ -75,21 +75,25 @@ func NewWallet() *Wallet {
 	return w
 }
 
-func NewTransaction(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, sender, recipient string, value float32) *Transaction {
-	return &Transaction{privateKey, publicKey, sender, recipient, value}
+func NewTransaction(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, sender string, recipient string, value float32) *Transaction {
+	return &Transaction{senderPrivateKey: privateKey,
+		senderPublicKey:            publicKey,
+		senderBlockchainAddress:    sender,
+		recipientBlockchainAddress: recipient,
+		value:                      value}
 }
 
 func (t *Transaction) GenerateSignature() *utils.Signature {
 	m, _ := json.Marshal(t)
 	h := sha256.Sum256([]byte(m))
 	r, s, _ := ecdsa.Sign(rand.Reader, t.senderPrivateKey, h[:])
-	return &utils.Signature{r, s}
+	return &utils.Signature{R: r, S: s}
 }
 
 func (t *Transaction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Sender    string  `json:"sender_blockchain_address"`
-		Recipient string  `json:"recipient_blockchain_address"`
+		Sender    string  `json:"sender_block_chain_address"`
+		Recipient string  `json:"recipient_block_chain_address"`
 		Value     float32 `json:"value"`
 	}{
 		Sender:    t.senderBlockchainAddress,
