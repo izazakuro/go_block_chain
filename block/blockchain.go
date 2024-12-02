@@ -109,13 +109,23 @@ func (bc *Blockchain) Print() {
 	}
 }
 
+func (bc *Blockchain) CreateTransaction(sender string, recipient string, value float32, senderPublickey *ecdsa.PublicKey, s *utils.Signature) bool {
+
+	isTransacted := bc.AddTransaction(sender, recipient, value, senderPublickey, s)
+
+	//sync
+
+	return isTransacted
+
+}
+
 func (bc *Blockchain) AddTransaction(sender string, recipient string, value float32, senderPublickey *ecdsa.PublicKey, s *utils.Signature) bool {
 	t := NewTransaction(sender, recipient, value)
 
-	/*if sender == MINING_SENDER {
+	if sender == MINING_SENDER {
 		bc.transactionPool = append(bc.transactionPool, t)
 		return true
-	}*/
+	}
 
 	if bc.VerifyTransactionSignature(senderPublickey, s, t) {
 		if bc.CalculateTotalAmount(sender) < value {
@@ -128,6 +138,11 @@ func (bc *Blockchain) AddTransaction(sender string, recipient string, value floa
 		log.Println("ERROR: Verify Failed")
 	}
 	return false
+}
+
+func (bc *Blockchain) TransactionPool() []*Transaction {
+
+	return bc.transactionPool
 }
 
 func (bc *Blockchain) CopyTransactionPool() []*Transaction {
@@ -222,12 +237,32 @@ func (t *Transaction) Print() {
 
 func (t *Transaction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		SenderBlockChainAddress    string  `json:"sender_block_chain_address"`
-		RecipientBlockChainAddress string  `json:"recipient_block_chain_address"`
+		SenderBlockChainAddress    string  `json:"sender_blockchain_address"`
+		RecipientBlockChainAddress string  `json:"recipient_blockchain_address"`
 		Value                      float32 `json:"value"`
 	}{
 		SenderBlockChainAddress:    t.senderBlockChainAddress,
 		RecipientBlockChainAddress: t.recipientBlockChainAddress,
 		Value:                      t.value,
 	})
+}
+
+type TransactionRequest struct {
+	SenderBlockChainAddress    *string  `json:"sender_blockchain_address"`
+	RecipientBlockChainAddress *string  `json:"recipient_blockchain_address"`
+	SenderPublicKey            *string  `json:"sender_public_key"`
+	Value                      *float32 `json:"value"`
+	Signature                  *string  `json:"signature"`
+}
+
+func (tr *TransactionRequest) Validate() bool {
+	if tr.SenderBlockChainAddress == nil ||
+		tr.RecipientBlockChainAddress == nil ||
+		tr.SenderPublicKey == nil ||
+		tr.Signature == nil ||
+		tr.Value == nil {
+		return false
+	}
+
+	return true
 }
