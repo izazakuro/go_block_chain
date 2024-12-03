@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/izazakuro/go_block_chain/utils"
@@ -16,6 +17,7 @@ const (
 	MINING_DIFFICULTY = 3
 	MINING_SENDER     = "BLOCKCHAIN"
 	MINING_REWARD     = 1.0
+	MINING_TIMER_SEC  = 20
 )
 
 // Block
@@ -31,6 +33,7 @@ type Blockchain struct {
 	chain             []*Block
 	blockchainAddress string
 	port              uint16
+	mux               sync.Mutex
 }
 
 func NewBlock(nonce int, previousHash [32]byte, transactions []*Transaction) *Block {
@@ -128,10 +131,13 @@ func (bc *Blockchain) AddTransaction(sender string, recipient string, value floa
 	}
 
 	if bc.VerifyTransactionSignature(senderPublickey, s, t) {
-		if bc.CalculateTotalAmount(sender) < value {
+		/*if bc.CalculateTotalAmount(sender) < value {
 			log.Println("ERROR: Balance is not enough")
-		}
+		}*/
+
 		bc.transactionPool = append(bc.transactionPool, t)
+		fmt.Println("Transaction added")
+		fmt.Println(bc.transactionPool)
 		return true
 
 	} else {
@@ -188,12 +194,24 @@ func (bc *Blockchain) VerifyTransactionSignature(senderPublickey *ecdsa.PublicKe
 
 // Mining
 func (bc *Blockchain) Mining() bool {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+
+	if len(bc.transactionPool) == 0 {
+		return false
+	}
+
 	bc.AddTransaction(MINING_SENDER, bc.blockchainAddress, MINING_REWARD, nil, nil)
 	nonce := bc.ProofOfWork()
 	previousHash := bc.LastBlock().Hash()
 	bc.CreateBlock(nonce, previousHash)
 	log.Println("MINING SUCCESS")
 	return true
+}
+
+func (bc *Blockchain) StartMining() {
+	bc.Mining()
+	_ = time.AfterFunc(time.Second*MINING_TIMER_SEC, bc.StartMining)
 }
 
 func (bc *Blockchain) CalculateTotalAmount(blockchainAddress string) float32 {
@@ -265,4 +283,16 @@ func (tr *TransactionRequest) Validate() bool {
 	}
 
 	return true
+}
+
+type AmountRespone struct {
+	Amount float32 `json:"amount"`
+}
+
+func (ar *AmountRespone) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Amount float32 `json:"amount"`
+	}{
+		Amount: ar.Amount,
+	})
 }

@@ -31,8 +31,8 @@ func (bcs *BlockchainServer) GetBlockchain() *block.Blockchain {
 	if !ok {
 		minersWallet := wallet.NewWallet()
 		bc = block.NewBlockchain(minersWallet.BlockchainAddress(), bcs.Port())
+		cache["blockchain"] = bc
 	}
-	cache["blockchain"] = bc
 	return bc
 }
 
@@ -103,8 +103,65 @@ func (bcs *BlockchainServer) Transactions(w http.ResponseWriter, req *http.Reque
 	}
 }
 
+func (bcs *BlockchainServer) Mine(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		bc := bcs.GetBlockchain()
+		isMined := bc.Mining()
+
+		var m []byte
+		if !isMined {
+			w.WriteHeader(http.StatusBadRequest)
+			m = utils.JsonStatus("mining failed")
+		} else {
+			m = utils.JsonStatus("success")
+		}
+		w.Header().Add("Content-Type", "application/json")
+		io.Writer.Write(w, m)
+	default:
+		log.Println("Error:Invalid http method")
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+func (bcs *BlockchainServer) StartMine(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		bc := bcs.GetBlockchain()
+		bc.StartMining()
+
+		m := utils.JsonStatus("success")
+
+		w.Header().Add("Content-Type", "application/json")
+		io.Writer.Write(w, m)
+	default:
+		log.Println("Error:Invalid http method")
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+func (bcs *BlockchainServer) Amount(w http.ResponseWriter, req *http.Request) {
+
+	switch req.Method {
+	case http.MethodGet:
+		blockchainAddress := req.URL.Query().Get("blockchain_address")
+		amount := bcs.GetBlockchain().CalculateTotalAmount(blockchainAddress)
+
+		ar := &block.AmountRespone{Amount: amount}
+		m, _ := ar.MarshalJSON()
+
+		w.Header().Add("Content-Type", "application/json")
+		io.Writer.Write(w, m)
+	default:
+		log.Println("Error:Invalid http method")
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
 func (bcs *BlockchainServer) Run() {
 	http.HandleFunc("/", bcs.GetChain)
 	http.HandleFunc("/transactions", bcs.Transactions)
+	http.HandleFunc("/mine/start", bcs.StartMine)
+	http.HandleFunc("/amount", bcs.Amount)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+strconv.Itoa(int(bcs.Port())), nil))
 }
